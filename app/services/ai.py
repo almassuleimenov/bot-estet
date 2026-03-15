@@ -77,30 +77,56 @@ async def generate_dental_reply(user_text: str, history: str = "") -> dict:
     - "booking_requested": ВНИМАНИЕ! Ставь этот статус ТОЛЬКО если пациент явно сказал, КОГДА хочет прийти (например: "давай завтра в 2", "запишите на пятницу"). В поле "reply" при этом напиши: "Отлично! Передаю вашу заявку администратору. Сейчас он проверит расписание и напишет вам для подтверждения 🌸".
     """
 
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_text},
+    ]
+
+    # ЭТАП 1: Попытка вызвать основную модель
     try:
         response = await client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text},
-            ],
+            messages=messages,
             model="llama-3.3-70b-versatile",
             temperature=0.3,
             response_format={"type": "json_object"}
         )
+    except Exception as e:
+        print(f"⚠️ Ошибка основной модели 70B: {e}")
+        print("🔄 Переключаемся на резервную модель Llama 3.1 8B...")
         
+        # ЭТАП 2: Fallback на запасную модель
+        try:
+            response = await client.chat.completions.create(
+                messages=messages,
+                model="llama-3.1-8b-instant",
+                temperature=0.3,
+                response_format={"type": "json_object"}
+            )
+        except Exception as backup_e:
+            print(f"❌ Ошибка резервной модели: {backup_e}")
+            # Если упало всё (например, вообще нет интернета или упали сервера Groq)
+            return {
+                "reply": "Извините, у нас небольшая техническая заминка. Пожалуйста, подождите минутку или позвоните нам напрямую 🦷", 
+                "action": "none",
+                "suggested_service": None,
+                "appointment_time": None
+            }
+
+    # ЭТАП 3: Парсинг JSON (отдельный try-except для защиты от сломанного формата)
+    try:
         raw_content = response.choices[0].message.content.strip()
         parsed_data = json.loads(raw_content)
         
-        # Защита от ошибок парсинга
+        # Защита от потери обязательных ключей
         if "action" not in parsed_data:
             parsed_data["action"] = "none"
             
         return parsed_data
-
-    except Exception as e:
-        print(f"❌ Ошибка ИИ: {e}")
+        
+    except json.JSONDecodeError as json_e:
+        print(f"❌ Ошибка парсинга JSON от ИИ: {json_e}\nОтвет ИИ: {raw_content}")
         return {
-            "reply": "Извините, у нас небольшая техническая заминка. Пожалуйста, подождите минутку 🦷", 
+            "reply": "Секундочку, уточняю информацию...", 
             "action": "none",
             "suggested_service": None,
             "appointment_time": None

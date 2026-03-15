@@ -78,9 +78,19 @@ async def handle_whatsapp_webhook(
     typing_delay = len(ai_reply_text) / 20.0 + random.uniform(0.5, 1.5)
     await asyncio.sleep(min(typing_delay, 5)) # Максимум 5 секунд, чтобы клиент не устал ждать
 
-    # 7. Обновляем историю диалога
-    new_context = f"{client.context}\nКлиент: {user_text}\nЭстет: {ai_reply_text}"
-    client.context = new_context[-2000:] 
+    # 7. Обновляем историю диалога (ПРАВИЛЬНЫЙ ПОДХОД ДЛЯ ПРОДАКШЕНА)
+    # Разбиваем старый контекст на строки (сообщения)
+    messages_list = client.context.split('\n') if client.context else []
+    
+    # Добавляем новые реплики
+    messages_list.append(f"Клиент: {user_text}")
+    messages_list.append(f"Эстет: {ai_reply_text}")
+    
+    # Очищаем от пустых строк на всякий случай
+    messages_list = [m for m in messages_list if m.strip()]
+    
+    # Оставляем только последние 10 сообщений (5 вопросов клиента, 5 ответов бота)
+    client.context = '\n'.join(messages_list[-10:]) 
 
     # 8. Заявка на прием
     if ai_action == "booking_requested" and appointment_time:
