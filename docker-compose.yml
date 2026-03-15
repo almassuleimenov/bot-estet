@@ -1,36 +1,9 @@
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: estet-postgres
-    restart: always
-    # Подключаем .env, чтобы база сама взяла POSTGRES_USER, PASSWORD и DB
-    env_file:
-      - .env
-    ports:
-      - "5435:5432"
-    volumes:
-      # Относительный путь для удобного переноса проекта
-      - ./postgres_data:/var/lib/postgresql/data
-
   app:
     build: .
     container_name: estet-app
     restart: always
-    # Подключаем файл с ключами (Groq, Green API и настройки БД)
     env_file:
-      - .env
-    environment:
-      # Собираем URL динамически из переменных .env, чтобы не писать пароль дважды
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    depends_on:
-      - db
+      - .env  # Теперь он честно берет твою ссылку на Neon отсюда!
     ports:
       - "8000:8000"
-
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: estet-tunnel
-    restart: always
-    command: tunnel --url http://app:8000
-    depends_on:
-      - app
