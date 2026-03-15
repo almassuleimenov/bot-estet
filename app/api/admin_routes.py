@@ -67,3 +67,17 @@ async def update_appointment(
         appointment.appointment_time = update_data.new_time # Сохраняем новое время
     await db.commit()
     return {"status": "success", "message": "Заявка обновлена, клиент уведомлен!"}
+@router.put("/clients/{client_id}/toggle-bot")
+async def toggle_bot_status(client_id: int, db: AsyncSession = Depends(get_db)):
+    """Включает или выключает ИИ для конкретного клиента"""
+    result = await db.execute(select(Client).where(Client.id == client_id))
+    client = result.scalars().first()
+    
+    if not client:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+        
+    client.is_bot_active = not client.is_bot_active # Меняем статус на противоположный
+    await db.commit()
+    
+    status_text = "включен" if client.is_bot_active else "отключен"
+    return {"status": "success", "message": f"Бот {status_text} для клиента", "is_bot_active": client.is_bot_active}
