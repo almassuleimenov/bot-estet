@@ -93,18 +93,37 @@ async def handle_whatsapp_webhook(
     client.context = '\n'.join(messages_list[-10:]) 
 
     # 8. Заявка на прием
-    if ai_action == "booking_requested" and appointment_time:
-        new_appointment = Appointment(
-            client_id=client.id,
-            service_name=suggested_service,
-            appointment_time=appointment_time,
-            status="pending"
+    if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
+        # Ищем, есть ли у клиента уже активная заявка (которую мы переносили или которая висит)
+        result_app = await db.execute(
+            select(Appointment)
+            .where(Appointment.client_id == client.id)
+            .where(Appointment.status.in_(["pending", "rescheduled"]))
+            .order_by(Appointment.id.desc())
         )
-        db.add(new_appointment)
-        print(f"🛎️ НОВАЯ ЗАЯВКА! Услуга: {suggested_service}, Время: {appointment_time}")
+        existing_app = result_app.scalars().first()
+
+        if existing_app:
+            # Заявка уже есть. Обновляем время
+            existing_app.appointment_time = appointment_time
+            # Если клиент согласился на предложенное время -> Автоматически подтверждаем!
+            if ai_action == "time_agreed" or existing_app.status == "rescheduled":
+                existing_app.status = "confirmed"
+                print(f"✅ Клиент согласился на время {appointment_time}. Статус -> confirmed")
+            else:
+                existing_app.status = "pending"
+        else:
+            # Создаем новую заявку
+            new_appointment = Appointment(
+                client_id=client.id,
+                service_name=suggested_service,
+                appointment_time=appointment_time,
+                status="pending"
+            )
+            db.add(new_appointment)
+            print(f"🛎️ НОВАЯ ЗАЯВКА! Услуга: {suggested_service}, Время: {appointment_time}")
 
     await db.commit()
-
     # 9. И только теперь отправляем готовый ответ
     await send_whatsapp_message(chat_id, ai_reply_text)
 
