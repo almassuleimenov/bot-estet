@@ -56,15 +56,11 @@ async def update_appointment(
         )
         await send_whatsapp_message(appointment.client.chat_id, msg)
 
-    # 3. ЕСЛИ ВРЕМЯ ЗАНЯТО -> Предлагаем новое
+    # 3. ЕСЛИ ВРЕМЯ ЗАНЯТО -> Предлагаем новое (гибкий текст от админа)
     elif update_data.status == "rescheduled" and update_data.new_time:
-        msg = (
-            f"🌸 Здравствуйте! К сожалению, на {appointment.appointment_time} у нас всё занято.\n\n"
-            f"Но администратор выделил для вас окно: *{update_data.new_time}*.\n"
-            f"Вам будет удобно подойти в это время?"
-        )
+        msg = f"🌸 Здравствуйте! Администратор проверил расписание:\n\n{update_data.new_time}"
         await send_whatsapp_message(appointment.client.chat_id, msg)
-        appointment.appointment_time = update_data.new_time # Сохраняем новое время
+        appointment.appointment_time = update_data.new_time
     await db.commit()
     return {"status": "success", "message": "Заявка обновлена, клиент уведомлен!"}
 @router.put("/clients/{client_id}/toggle-bot")

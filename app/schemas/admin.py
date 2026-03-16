@@ -7,7 +7,8 @@ class ClientResponse(BaseModel):
     chat_id: str
     name: Optional[str]
     is_bot_active: bool
-
+    context: Optional[str] = ""
+    
     model_config = ConfigDict(from_attributes=True) # Позволяет Pydantic читать данные из базы SQLAlchemy
 
 # Схема для чтения записи на прием (Appointment)
