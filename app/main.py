@@ -5,7 +5,9 @@ from app.models import Base  # Импортируем Base, который уж�
 from app.api.webhooks import router as webhooks_router
 from app.api.admin_routes import router as admin_router # <-- Добавили импорт
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.instagram import router as instagram_router # <-- Добавили импорт
+from app.api.instagram import router as instagram_router 
+from app.models.doctor import Doctor          # <-- ВАЖНО!
+from app.models.settings import BotSettings # <-- Добавили импорт
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
