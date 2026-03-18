@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
+
 # Схема для чтения данных о клиенте
 class ClientResponse(BaseModel):
     id: int
@@ -8,8 +9,11 @@ class ClientResponse(BaseModel):
     name: Optional[str]
     is_bot_active: bool
     context: Optional[str] = ""
-    
-    model_config = ConfigDict(from_attributes=True) # Позволяет Pydantic читать данные из базы SQLAlchemy
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )  # Позволяет Pydantic читать данные из базы SQLAlchemy
+
 
 # Схема для чтения записи на прием (Appointment)
 class AppointmentResponse(BaseModel):
@@ -19,14 +23,15 @@ class AppointmentResponse(BaseModel):
     service_name: Optional[str]
     appointment_time: Optional[str]
     status: str
-    
+
     # Включаем вложенные данные клиента, чтобы в админке сразу был виден его номер
-    client: Optional[ClientResponse] = None 
+    client: Optional[ClientResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # Схема для того, чтобы админ мог обновить статус (например, назначить врача)
 class AppointmentUpdateRequest(BaseModel):
     doctor_id: Optional[int] = None
-    status: Optional[str] = None # "confirmed", "rescheduled" и т.д.
-    new_time: Optional[str] = None # Если админ предлагает другое время
+    status: Optional[str] = None  # "confirmed", "rescheduled" и т.д.
+    new_time: Optional[str] = None  # Если админ предлагает другое время

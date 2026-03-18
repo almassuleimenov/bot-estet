@@ -9,6 +9,7 @@ load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 client = AsyncGroq(api_key=api_key)
 
+
 async def transcribe_audio_from_url(audio_url: str) -> str:
     """
     Скачивает аудио по ссылке и отправляет в Groq Whisper.
@@ -45,6 +46,6 @@ async def transcribe_audio_from_url(audio_url: str) -> str:
     except Exception as e:
         print(f"❌ Ошибка расшифровки аудио: {e}")
         # Если что-то пошло не так, не забываем удалить файл
-        if 'temp_filepath' in locals() and os.path.exists(temp_filepath):
+        if "temp_filepath" in locals() and os.path.exists(temp_filepath):
             os.remove(temp_filepath)
         return ""

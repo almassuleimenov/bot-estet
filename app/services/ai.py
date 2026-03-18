@@ -9,8 +9,14 @@ api_key = os.getenv("GROQ_API_KEY")
 client = AsyncGroq(api_key=api_key)
 
 
-async def generate_dental_reply(user_text: str, history: str = "",dynamic_price_list: str = "") -> dict:
-    current_prices = dynamic_price_list if dynamic_price_list else "Прайс-лист уточняется. Консультация 2000 тг."
+async def generate_dental_reply(
+    user_text: str, history: str = "", dynamic_price_list: str = ""
+) -> dict:
+    current_prices = (
+        dynamic_price_list
+        if dynamic_price_list
+        else "Прайс-лист уточняется. Консультация 2000 тг."
+    )
     system_prompt = f"""
     Ты — заботливый, вежливый и профессиональный администратор стоматологической клиники "Эстет". 
     Твоя главная цель: проконсультировать пациента, успокоить (если что-то болит) и мягко довести его до записи на прием, НЕ РАЗДРАЖАЯ ЕГО.
@@ -73,46 +79,46 @@ async def generate_dental_reply(user_text: str, history: str = "",dynamic_price_
             messages=messages,
             model="llama-3.3-70b-versatile",
             temperature=0.3,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
         )
     except Exception as e:
         print(f"⚠️ Ошибка основной модели 70B: {e}")
         print("🔄 Переключаемся на резервную модель Llama 3.1 8B...")
-        
+
         # ЭТАП 2: Fallback на запасную модель
         try:
             response = await client.chat.completions.create(
                 messages=messages,
                 model="llama-3.1-8b-instant",
                 temperature=0.3,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
         except Exception as backup_e:
             print(f"❌ Ошибка резервной модели: {backup_e}")
             # Если упало всё (например, вообще нет интернета или упали сервера Groq)
             return {
-                "reply": "Извините, у нас небольшая техническая заминка. Пожалуйста, подождите минутку или позвоните нам напрямую 🦷", 
+                "reply": "Извините, у нас небольшая техническая заминка. Пожалуйста, подождите минутку или позвоните нам напрямую 🦷",
                 "action": "none",
                 "suggested_service": None,
-                "appointment_time": None
+                "appointment_time": None,
             }
 
     # ЭТАП 3: Парсинг JSON (отдельный try-except для защиты от сломанного формата)
     try:
         raw_content = response.choices[0].message.content.strip()
         parsed_data = json.loads(raw_content)
-        
+
         # Защита от потери обязательных ключей
         if "action" not in parsed_data:
             parsed_data["action"] = "none"
-            
+
         return parsed_data
-        
+
     except json.JSONDecodeError as json_e:
         print(f"❌ Ошибка парсинга JSON от ИИ: {json_e}\nОтвет ИИ: {raw_content}")
         return {
-            "reply": "Секундочку, уточняю информацию...", 
+            "reply": "Секундочку, уточняю информацию...",
             "action": "none",
             "suggested_service": None,
-            "appointment_time": None
+            "appointment_time": None,
         }

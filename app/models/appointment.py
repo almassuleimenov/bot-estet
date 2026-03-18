@@ -2,18 +2,25 @@ from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
+
 class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True) # Может быть пустым, пока админ не назначит врача
-    
-    service_name = Column(String, nullable=True) # Какая услуга нужна (Отбеливание, Консультация)
-    appointment_time = Column(String, nullable=True) # Желаемое время (например, "Завтра в 15:00")
-    
+    doctor_id = Column(
+        Integer, ForeignKey("doctors.id"), nullable=True
+    )  # Может быть пустым, пока админ не назначит врача
+
+    service_name = Column(
+        String, nullable=True
+    )  # Какая услуга нужна (Отбеливание, Консультация)
+    appointment_time = Column(
+        String, nullable=True
+    )  # Желаемое время (например, "Завтра в 15:00")
+
     # Статусы: pending (ждет админа), confirmed (бинго!), rescheduled (админ предложил другое время)
-    status = Column(String, default="pending") 
+    status = Column(String, default="pending")
 
     # Связи для удобного получения данных
     client = relationship("Client", backref="appointments")

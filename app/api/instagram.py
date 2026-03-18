@@ -5,6 +5,7 @@ router = APIRouter(prefix="/api/instagram", tags=["Instagram Webhooks"])
 # Это наш секретный пароль. Можешь придумать любой, но мы будем использовать этот:
 VERIFY_TOKEN = "estet_super_secret_token_123"
 
+
 @router.get("/webhook")
 async def verify_instagram_webhook(request: Request):
     """
