@@ -50,9 +50,18 @@ async def handle_whatsapp_webhook(
         await db.commit()
         await db.refresh(client)
 
-    # 4. 🚨 ПРОВЕРКА КНОПКИ "СТОП" 🚨
+    # Подготавливаем текущую историю
+    messages_list = client.context.split('\n') if client.context else []
+    messages_list = [m for m in messages_list if m.strip()]
+
+    # 4. 🚨 ПРОВЕРКА КНОПКИ "СТОП" (ФИКС) 🚨
     if not client.is_bot_active:
-        print(f"🤫 Бот спит для клиента {chat_id}. Ждем ответа админа.")
+        print(f"🤫 Бот спит для клиента {chat_id}. Сохраняем сообщение для админа, но молчим.")
+        # Сохраняем то, что написал клиент, чтобы админ видел это в CRM
+        messages_list.append(f"Клиент: {user_text}")
+        client.context = '\n'.join(messages_list[-6:]) # Оставляем только 6 последних
+        
+        await db.commit() # Сохраняем в БД
         return {"status": "bot_is_sleeping"}
 
     # ==========================================
@@ -66,31 +75,23 @@ async def handle_whatsapp_webhook(
     # Включаем плашку "печатает..."
     await set_typing_status(chat_id)
 
-    # 5. Отправляем текст ИИ (вместе с историей). Это займет 1-3 секунды (идеально совпадает со временем "печати")
+    # 5. Отправляем текст ИИ (вместе с историей)
     ai_response = await generate_dental_reply(user_text, client.context)
     ai_reply_text = ai_response.get("reply", "Минуточку...")
     ai_action = ai_response.get("action", "none")
     suggested_service = ai_response.get("suggested_service")
     appointment_time = ai_response.get("appointment_time")
 
-    # 6. Динамическая пауза (чем длиннее текст придумал ИИ, тем дольше мы "печатаем")
-    # Допустим, человек печатает 20 символов в секунду
+    # 6. Динамическая пауза (чем длиннее текст, тем дольше "печатаем")
     typing_delay = len(ai_reply_text) / 20.0 + random.uniform(0.5, 1.5)
-    await asyncio.sleep(min(typing_delay, 5)) # Максимум 5 секунд, чтобы клиент не устал ждать
+    await asyncio.sleep(min(typing_delay, 5))
 
-    # 7. Обновляем историю диалога (ПРАВИЛЬНЫЙ ПОДХОД ДЛЯ ПРОДАКШЕНА)
-    # Разбиваем старый контекст на строки (сообщения)
-    messages_list = client.context.split('\n') if client.context else []
-    
-    # Добавляем новые реплики
+    # 7. Обновляем историю диалога (ФИКС ГАЛЛЮЦИНАЦИЙ)
     messages_list.append(f"Клиент: {user_text}")
     messages_list.append(f"Эстет: {ai_reply_text}")
     
-    # Очищаем от пустых строк на всякий случай
-    messages_list = [m for m in messages_list if m.strip()]
-    
-    # Оставляем только последние 10 сообщений (5 вопросов клиента, 5 ответов бота)
-    client.context = '\n'.join(messages_list[-10:]) 
+    # ✂️ Оставляем ТОЛЬКО 6 последних сообщений (3 вопроса, 3 ответа), чтобы ИИ не тупил
+    client.context = '\n'.join(messages_list[-6:]) 
 
     # 8. Заявка на прием
     if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
