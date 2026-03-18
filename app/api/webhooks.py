@@ -106,6 +106,7 @@ async def handle_whatsapp_webhook(
     client.context = '\n'.join(messages_list[-6:]) 
 
     # 8. Заявка на прием
+    # 8. Заявка на прием
     if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
         # Ищем, есть ли у клиента уже активная заявка (которую мы переносили или которая висит)
         result_app = await db.execute(
@@ -119,12 +120,11 @@ async def handle_whatsapp_webhook(
         if existing_app:
             # Заявка уже есть. Обновляем время
             existing_app.appointment_time = appointment_time
-            # Если клиент согласился на предложенное время -> Автоматически подтверждаем!
-            if ai_action == "time_agreed" or existing_app.status == "rescheduled":
-                existing_app.status = "confirmed"
-                print(f"✅ Клиент согласился на время {appointment_time}. Статус -> confirmed")
-            else:
-                existing_app.status = "pending"
+            
+            # 🛑 ФИКС БИЗНЕС-ЛОГИКИ: Всегда возвращаем карточку в "Запросы" (pending)
+            # Чтобы админ мог выбрать врача перед финальным подтверждением!
+            existing_app.status = "pending"
+            print(f"🔄 Время обновлено на {appointment_time}. Карточка ждет назначения врача админом (pending).")
         else:
             # Создаем новую заявку
             new_appointment = Appointment(

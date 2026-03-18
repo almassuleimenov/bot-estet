@@ -47,23 +47,49 @@ async def update_appointment(
     if update_data.status:
         appointment.status = update_data.status
 
-    # 2. ЕСЛИ ПОДТВЕРДИЛИ -> Пишем клиенту радостную новость
-    # 2. ЕСЛИ ПОДТВЕРДИЛИ -> Пишем клиенту радостную новость с 2GIS
+    # 2. ЕСЛИ ПОДТВЕРДИЛИ -> Пишем клиенту радостную новость И УВЕДОМЛЯЕМ ВРАЧА
     if update_data.status == "confirmed":
-        msg = (
+        # --- 2.1 СООБЩЕНИЕ ПАЦИЕНТУ ---
+        msg_to_client = (
             f"🎉 Отличные новости! Ваша запись на *{appointment.appointment_time}* подтверждена.\n\n"
             f"Ждем вас в стоматологии «Эстет»! 🦷\n"
             f"🗺️ Построить маршрут в 2GIS: https://2gis.kz/turkestan/geo/70000001090123854"
         )
-        await send_whatsapp_message(appointment.client.chat_id, msg)
+        await send_whatsapp_message(appointment.client.chat_id, msg_to_client)
+
+        # --- 2.2 🚨 УВЕДОМЛЕНИЕ ВРАЧУ (НОВАЯ ФИЧА) 🚨 ---
+        if update_data.doctor_id:
+            # Ищем врача в базе, чтобы узнать его номер
+            doc_result = await db.execute(select(Doctor).where(Doctor.id == update_data.doctor_id))
+            doctor = doc_result.scalars().first()
+            
+            # Если у врача есть номер, отправляем ему пуш в WhatsApp
+            if doctor and doctor.phone:
+                # Маскируем номер пациента (например: 7702***4267) для безопасности
+                raw_phone = appointment.client.chat_id.replace("@c.us", "")
+                hidden_phone = f"+{raw_phone[:4]} *** ** {raw_phone[-4:]}" if len(raw_phone) > 8 else "Скрыт"
+                
+                # Добавляем @c.us к номеру врача, если его там нет
+                doc_chat_id = doctor.phone if "@c.us" in doctor.phone else f"{doctor.phone}@c.us"
+                
+                msg_to_doctor = (
+                    f"👨‍⚕️ *Жаңа жазылу! (Новая запись)*\n\n"
+                    f"📅 *Уақыты:* {appointment.appointment_time}\n"
+                    f"🦷 *Қызмет:* {appointment.service_name or 'Консультация'}\n"
+                    f"👤 *Пациент:* {hidden_phone}\n\n"
+                    f"Сәттілік, дәрігер! ✨"
+                )
+                await send_whatsapp_message(doc_chat_id, msg_to_doctor)
+                print(f"✅ Уведомление отправлено врачу {doctor.name} на номер {doc_chat_id}")
 
     # 3. ЕСЛИ ВРЕМЯ ЗАНЯТО -> Предлагаем новое (гибкий текст от админа)
     elif update_data.status == "rescheduled" and update_data.new_time:
         msg = f"🌸 Здравствуйте! Администратор проверил расписание:\n\n{update_data.new_time}"
         await send_whatsapp_message(appointment.client.chat_id, msg)
         appointment.appointment_time = update_data.new_time
+        
     await db.commit()
-    return {"status": "success", "message": "Заявка обновлена, клиент уведомлен!"}
+    return {"status": "success", "message": "Заявка обновлена, клиент и врач уведомлены!"}
 @router.put("/clients/{client_id}/toggle-bot")
 async def toggle_bot_status(client_id: int, db: AsyncSession = Depends(get_db)):
     """Включает или выключает ИИ для конкретного клиента"""
