@@ -133,3 +133,22 @@ async def update_settings(data: SettingsUpdateRequest, db: AsyncSession = Depend
         
     await db.commit()
     return {"status": "success", "message": "Настройки ИИ обновлены!"}
+
+class DoctorCreateRequest(BaseModel):
+    name: str
+    phone: str
+    specialty: str = ""
+
+@router.get("/doctors")
+async def get_doctors(db: AsyncSession = Depends(get_db)):
+    """Получить список всех врачей"""
+    result = await db.execute(select(Doctor).order_by(Doctor.id.asc()))
+    return result.scalars().all()
+
+@router.post("/doctors")
+async def add_doctor(data: DoctorCreateRequest, db: AsyncSession = Depends(get_db)):
+    """Добавить нового врача"""
+    new_doc = Doctor(name=data.name, phone=data.phone, specialty=data.specialty)
+    db.add(new_doc)
+    await db.commit()
+    return {"status": "success", "message": "Врач успешно добавлен!"}
