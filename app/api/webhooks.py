@@ -12,6 +12,7 @@ from app.services.ai import generate_dental_reply
 # ВАЖНО: Импортируем новые функции!
 from app.services.whatsapp import send_whatsapp_message, set_read_status, set_typing_status 
 from app.services.audio import transcribe_audio_from_url
+from app.models.settings import BotSettings 
 
 router = APIRouter()
 
@@ -75,8 +76,16 @@ async def handle_whatsapp_webhook(
     # Включаем плашку "печатает..."
     await set_typing_status(chat_id)
 
-    # 5. Отправляем текст ИИ (вместе с историей)
-    ai_response = await generate_dental_reply(user_text, client.context)
+    # 5. Отправляем текст ИИ (вместе с историей И ДИНАМИЧЕСКИМ ПРАЙСОМ)
+    
+    # Сначала достаем прайс из БД
+    settings_result = await db.execute(select(BotSettings).where(BotSettings.id == 1))
+    bot_settings = settings_result.scalars().first()
+    current_price_list = bot_settings.price_list if bot_settings else "Прайс-лист уточняется. Консультация 2000 тг."
+
+    # Передаем текст пользователя, историю и НАШ ПРАЙС в функцию ИИ
+    ai_response = await generate_dental_reply(user_text, client.context, current_price_list)
+    
     ai_reply_text = ai_response.get("reply", "Минуточку...")
     ai_action = ai_response.get("action", "none")
     suggested_service = ai_response.get("suggested_service")

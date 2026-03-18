@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from typing import List
-
+from pydantic import BaseModel
+from app.models.settings import BotSettings
 from app.core.database import get_db
 from app.models.appointment import Appointment
 from app.models.client import Client
@@ -77,3 +78,32 @@ async def toggle_bot_status(client_id: int, db: AsyncSession = Depends(get_db)):
     
     status_text = "включен" if client.is_bot_active else "отключен"
     return {"status": "success", "message": f"Бот {status_text} для клиента", "is_bot_active": client.is_bot_active}
+# --- НАСТРОЙКИ ИИ ---
+
+class SettingsUpdateRequest(BaseModel):
+    price_list: str
+
+@router.get("/settings")
+async def get_settings(db: AsyncSession = Depends(get_db)):
+    """Отдает текущий прайс-лист в React"""
+    result = await db.execute(select(BotSettings).where(BotSettings.id == 1))
+    settings = result.scalars().first()
+    
+    if not settings:
+        return {"price_list": ""}
+    return {"price_list": settings.price_list}
+
+@router.put("/settings")
+async def update_settings(data: SettingsUpdateRequest, db: AsyncSession = Depends(get_db)):
+    """Сохраняет новый прайс-лист от админа"""
+    result = await db.execute(select(BotSettings).where(BotSettings.id == 1))
+    settings = result.scalars().first()
+    
+    if not settings:
+        settings = BotSettings(id=1, price_list=data.price_list)
+        db.add(settings)
+    else:
+        settings.price_list = data.price_list
+        
+    await db.commit()
+    return {"status": "success", "message": "Настройки ИИ обновлены!"}

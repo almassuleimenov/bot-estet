@@ -41,7 +41,8 @@ PRICE_LIST = """
 - Протезы: Съемный акрил (40k), Биопласт (80k), Вакуумный (150-250k), Телескопический/Бюгельный (200-300k).
 """
 
-async def generate_dental_reply(user_text: str, history: str = "") -> dict:
+async def generate_dental_reply(user_text: str, history: str = "",dynamic_price_list: str = "") -> dict:
+    current_prices = dynamic_price_list if dynamic_price_list else "Прайс-лист уточняется. Консультация 2000 тг."
     system_prompt = f"""
     Ты — заботливый, вежливый и профессиональный администратор стоматологической клиники "Эстет". 
     Твоя главная цель: проконсультировать пациента, успокоить (если что-то болит) и мягко довести его до записи на прием.
