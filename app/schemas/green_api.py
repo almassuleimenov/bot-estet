@@ -4,7 +4,9 @@ from typing import Optional
 # Вложенные структуры для сообщения
 class TextMessageData(BaseModel):
     textMessage: str
-
+class ExtendedTextMessageData(BaseModel): # <-- ДОБАВИЛИ ЭТО!
+    text: str
+    
 class FileMessageData(BaseModel):
     downloadUrl: str
 

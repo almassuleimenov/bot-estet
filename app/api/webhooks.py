@@ -32,6 +32,8 @@ async def handle_whatsapp_webhook(
     # 2. Достаем текст или скачиваем аудио
     if msg_type == "textMessage":
         user_text = webhook.messageData.textMessageData.textMessage
+    elif msg_type == "extendedTextMessage": # <-- ОБРАБАТЫВАЕМ СВАЙПЫ-ОТВЕТЫ!
+        user_text = webhook.messageData.extendedTextMessageData.text
     elif msg_type == "audioMessage":
         audio_url = webhook.messageData.fileMessageData.downloadUrl
         user_text = await transcribe_audio_from_url(audio_url)
@@ -39,7 +41,8 @@ async def handle_whatsapp_webhook(
             await send_whatsapp_message(chat_id, "Извините, я не смогла разобрать голосовое сообщение. Напишите, пожалуйста, текстом 🌸")
             return {"status": "audio_failed"}
     else:
-        return {"status": "ignored", "reason": "unsupported message type"}
+        # Игнорируем картинки, стикеры, локации и т.д.
+        return {"status": "ignored", "reason": f"unsupported message type: {msg_type}"}
 
     # 3. Ищем клиента в базе
     result = await db.execute(select(Client).where(Client.chat_id == chat_id))
