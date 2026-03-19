@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
-from datetime import datetime # <-- ДОБАВИЛИ ИМПОРТ
+from datetime import datetime  # <-- ДОБАВИЛИ ИМПОРТ
 
 
 # Схема для чтения данных о клиенте
@@ -23,7 +23,9 @@ class AppointmentResponse(BaseModel):
     doctor_id: Optional[int] = None
     service_name: Optional[str] = None
     appointment_time: Optional[str] = None
-    scheduled_datetime: Optional[datetime] = None # <-- ДОБАВИЛИ СЮДА (чтобы админка могла читать это время)
+    scheduled_datetime: Optional[datetime] = (
+        None  # <-- ДОБАВИЛИ СЮДА (чтобы админка могла читать это время)
+    )
     status: str
 
     # Включаем вложенные данные клиента, чтобы в админке сразу был виден его номер
@@ -37,4 +39,6 @@ class AppointmentUpdateRequest(BaseModel):
     doctor_id: Optional[int] = None
     status: Optional[str] = None  # "confirmed", "rescheduled" и т.д.
     new_time: Optional[str] = None  # Если админ предлагает другое время
-    scheduled_datetime: Optional[datetime] = None  # <-- ДОБАВИЛИ СЮДА (Строгое машинное время из календаря!)
+    scheduled_datetime: Optional[datetime] = (
+        None  # <-- ДОБАВИЛИ СЮДА (Строгое машинное время из календаря!)
+    )

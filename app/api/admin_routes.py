@@ -11,7 +11,7 @@ from app.models.client import Client
 from app.models.doctor import Doctor
 from app.schemas.admin import AppointmentResponse, AppointmentUpdateRequest
 from app.services.whatsapp import send_whatsapp_message
-import datetime # <-- Добавили для дат
+import datetime  # <-- Добавили для дат
 
 router = APIRouter(prefix="/api/admin", tags=["Admin API"])
 
@@ -51,7 +51,7 @@ async def update_appointment(
         appointment.doctor_id = update_data.doctor_id
     if update_data.status:
         appointment.status = update_data.status
-        
+
     # ⏰ СОХРАНЯЕМ ТОЧНОЕ МАШИННОЕ ВРЕМЯ ДЛЯ НАПОМИНАНИЙ (CRON)
     if getattr(update_data, "scheduled_datetime", None):
         appointment.scheduled_datetime = update_data.scheduled_datetime

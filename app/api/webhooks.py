@@ -118,10 +118,10 @@ async def handle_whatsapp_webhook(
 
     # 8. Заявка на прием
     if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
-        
+
         # 🚨 НОМЕР АДМИНА ДЛЯ УВЕДОМЛЕНИЙ (Впиши сюда свой номер с @c.us)
-        ADMIN_WHATSAPP = "77753159203@c.us" 
-        
+        ADMIN_WHATSAPP = "77753159203@c.us"
+
         result_app = await db.execute(
             select(Appointment)
             .where(Appointment.client_id == client.id)
@@ -131,13 +131,15 @@ async def handle_whatsapp_webhook(
         existing_app = result_app.scalars().first()
 
         # Маскируем номер для красоты в уведомлении
-        clean_phone = chat_id.replace('@c.us', '')
+        clean_phone = chat_id.replace("@c.us", "")
 
         if existing_app:
             existing_app.appointment_time = appointment_time
             existing_app.status = "pending"
-            print(f"🔄 Время обновлено на {appointment_time}. Карточка ждет назначения врача админом (pending).")
-            
+            print(
+                f"🔄 Время обновлено на {appointment_time}. Карточка ждет назначения врача админом (pending)."
+            )
+
             # --- ОТПРАВЛЯЕМ ПУШ АДМИНУ (Обновление времени) ---
             admin_msg = (
                 f"⚠️ *CRM Эстет: Обновление заявки!*\n\n"
@@ -146,17 +148,19 @@ async def handle_whatsapp_webhook(
                 f"💻 Зайдите в админку, чтобы подтвердить и назначить врача!"
             )
             await send_whatsapp_message(ADMIN_WHATSAPP, admin_msg)
-            
+
         else:
             new_appointment = Appointment(
                 client_id=client.id,
                 service_name=suggested_service,
                 appointment_time=appointment_time,
-                status="pending"
+                status="pending",
             )
             db.add(new_appointment)
-            print(f"🛎️ НОВАЯ ЗАЯВКА! Услуга: {suggested_service}, Время: {appointment_time}")
-            
+            print(
+                f"🛎️ НОВАЯ ЗАЯВКА! Услуга: {suggested_service}, Время: {appointment_time}"
+            )
+
             # --- ОТПРАВЛЯЕМ ПУШ АДМИНУ (Новая заявка) ---
             admin_msg = (
                 f"🚨 *CRM Эстет: НОВАЯ ЗАЯВКА!*\n\n"

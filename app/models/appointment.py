@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -18,9 +18,11 @@ class Appointment(Base):
     appointment_time = Column(
         String, nullable=True
     )  # Желаемое время текстом (например, "Завтра в 15:00")
-    
+
     # ⏰ НОВАЯ КОЛОНКА ДЛЯ АВТО-НАПОМИНАНИЙ (Строгое машинное время)
     scheduled_datetime = Column(DateTime, nullable=True)
+
+    is_reminded = Column(Boolean, default=False)
 
     # Статусы: pending (ждет админа), confirmed (бинго!), rescheduled (админ предложил другое время), completed (завершено)
     status = Column(String, default="pending")
