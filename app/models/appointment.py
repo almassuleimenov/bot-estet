@@ -17,9 +17,12 @@ class Appointment(Base):
     )  # Какая услуга нужна (Отбеливание, Консультация)
     appointment_time = Column(
         String, nullable=True
-    )  # Желаемое время (например, "Завтра в 15:00")
+    )  # Желаемое время текстом (например, "Завтра в 15:00")
+    
+    # ⏰ НОВАЯ КОЛОНКА ДЛЯ АВТО-НАПОМИНАНИЙ (Строгое машинное время)
+    scheduled_datetime = Column(DateTime, nullable=True)
 
-    # Статусы: pending (ждет админа), confirmed (бинго!), rescheduled (админ предложил другое время)
+    # Статусы: pending (ждет админа), confirmed (бинго!), rescheduled (админ предложил другое время), completed (завершено)
     status = Column(String, default="pending")
 
     # Связи для удобного получения данных
