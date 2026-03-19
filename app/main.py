@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 # Подключение к БД и модели
 from app.core.database import (
     engine,
-    SessionLocal,
+    async_session,
 )  # <-- ВАЖНО: Убедись, что SessionLocal есть в database.py
 from app.models import Base
 from app.models.appointment import Appointment  # <-- Добавили для CRON
@@ -35,7 +35,7 @@ scheduler = AsyncIOScheduler()
 async def send_reminders():
     print("⏰ [CRON] Проверка заявок для напоминаний...")
     # Создаем временную сессию с базой данных для фоновой задачи
-    async with SessionLocal() as db:
+    async with async_session() as db:
         now = datetime.now()
         target_time = now + timedelta(hours=3)  # Ищем записи на ближайшие 3 часа
 
