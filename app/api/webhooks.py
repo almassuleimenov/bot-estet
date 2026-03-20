@@ -132,7 +132,7 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
     if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
 
         # 🚨 НОМЕР АДМИНА ДЛЯ УВЕДОМЛЕНИЙ (Впиши сюда свой номер с @c.us)
-        ADMIN_WHATSAPP = "77753159203@c.us"
+        ADMIN_WHATSAPP = "77772605712@c.us"
 
         result_app = await db.execute(
             select(Appointment)
