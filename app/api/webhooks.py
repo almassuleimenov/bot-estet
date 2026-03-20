@@ -1,11 +1,12 @@
 import asyncio
 import random
+import json
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.database import get_db
-from app.schemas.green_api import GreenApiWebhook
+# Схему GreenApiWebhook мы убрали из параметров, чтобы FastAPI не блокировал кривые свайпы
 from app.models.client import Client
 from app.models.appointment import Appointment
 from app.services.ai import generate_dental_reply
@@ -19,31 +20,43 @@ from app.models.settings import BotSettings
 
 router = APIRouter()
 
-
 @router.post("/whatsapp-webhook")
-async def handle_whatsapp_webhook(
-    webhook: GreenApiWebhook, db: AsyncSession = Depends(get_db)
-):
-    # 1. Проверяем, что это входящее сообщение
-    if webhook.typeWebhook != "incomingMessageReceived":
+async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    # 1. ЛОВИМ СЫРОЙ JSON (Бронебойный метод)
+    try:
+        raw_body = await request.json()
+        print(f"\n🚀 ПОЙМАЛИ ВЕБХУК: {json.dumps(raw_body, ensure_ascii=False)}\n")
+    except Exception as e:
+        print(f"❌ Ошибка чтения JSON: {e}")
+        return {"status": "error"}
+
+    # 2. Проверяем, что это входящее сообщение
+    type_webhook = raw_body.get("typeWebhook", "")
+    if type_webhook != "incomingMessageReceived":
         return {"status": "ignored", "reason": "not an incoming message"}
 
-    msg_type = webhook.messageData.typeMessage
-    chat_id = webhook.senderData.chatId
+    message_data = raw_body.get("messageData", {})
+    msg_type = message_data.get("typeMessage", "")
+    sender_data = raw_body.get("senderData", {})
+    chat_id = sender_data.get("chatId", "")
+    
     user_text = ""
 
-    # 2. БЕЗОПАСНО Достаем текст или скачиваем аудио
-    if msg_type == "textMessage" and webhook.messageData.textMessageData:
-        user_text = webhook.messageData.textMessageData.textMessage
-    elif (
-        msg_type == "extendedTextMessage"
-        and webhook.messageData.extendedTextMessageData
-    ):
-        # <-- ВОТ ОНА, МАГИЯ ДЛЯ СВАЙПОВ!
-        user_text = webhook.messageData.extendedTextMessageData.text
-    elif msg_type == "audioMessage" and webhook.messageData.fileMessageData:
-        audio_url = webhook.messageData.fileMessageData.downloadUrl
-        user_text = await transcribe_audio_from_url(audio_url)
+    # 3. ДОСТАЕМ ТЕКСТ (Любой ценой)
+    if msg_type == "textMessage":
+        user_text = message_data.get("textMessageData", {}).get("textMessage", "")
+
+    elif msg_type == "extendedTextMessage":
+        # МАГИЯ ДЛЯ СВАЙПОВ
+        user_text = message_data.get("extendedTextMessageData", {}).get("text", "")
+        if not user_text:
+            print("⚠️ Свайп пришел без поля 'text'! Вытаскиваем все, что есть...")
+            user_text = str(message_data.get("extendedTextMessageData", {}))
+
+    elif msg_type == "audioMessage":
+        audio_url = message_data.get("fileMessageData", {}).get("downloadUrl", "")
+        if audio_url:
+            user_text = await transcribe_audio_from_url(audio_url)
         if not user_text:
             await send_whatsapp_message(
                 chat_id,
@@ -58,7 +71,7 @@ async def handle_whatsapp_webhook(
     if not user_text:
         return {"status": "ignored", "reason": "empty text"}
 
-    # 3. Ищем клиента в базе
+    # 4. Ищем клиента в базе
     result = await db.execute(select(Client).where(Client.chat_id == chat_id))
     client = result.scalars().first()
 
@@ -72,11 +85,9 @@ async def handle_whatsapp_webhook(
     messages_list = client.context.split("\n") if client.context else []
     messages_list = [m for m in messages_list if m.strip()]
 
-    # 4. ПРОВЕРКА КНОПКИ "СТОП" (Админ в деле)
+    # 5. ПРОВЕРКА КНОПКИ "СТОП" (Админ в деле)
     if not client.is_bot_active:
-        print(
-            f"🤫 Бот спит для клиента {chat_id}. Сохраняем сообщение для админа, но молчим."
-        )
+        print(f"🤫 Бот спит для клиента {chat_id}. Сохраняем сообщение для админа, но молчим.")
         messages_list.append(f"Клиент: {user_text}")
         client.context = "\n".join(messages_list[-6:])
         await db.commit()
@@ -89,7 +100,7 @@ async def handle_whatsapp_webhook(
     await asyncio.sleep(random.uniform(0.5, 1.5))
     await set_typing_status(chat_id)
 
-    # 5. Отправляем текст ИИ (вместе с историей И ДИНАМИЧЕСКИМ ПРАЙСОМ)
+    # 6. Отправляем текст ИИ (вместе с историей И ДИНАМИЧЕСКИМ ПРАЙСОМ)
     settings_result = await db.execute(select(BotSettings).where(BotSettings.id == 1))
     bot_settings = settings_result.scalars().first()
     current_price_list = (
@@ -107,16 +118,16 @@ async def handle_whatsapp_webhook(
     suggested_service = ai_response.get("suggested_service")
     appointment_time = ai_response.get("appointment_time")
 
-    # 6. Динамическая пауза (чем длиннее текст, тем дольше "печатаем")
+    # 7. Динамическая пауза (чем длиннее текст, тем дольше "печатаем")
     typing_delay = len(ai_reply_text) / 20.0 + random.uniform(0.5, 1.5)
     await asyncio.sleep(min(typing_delay, 5))
 
-    # 7. Обновляем историю диалога
+    # 8. Обновляем историю диалога
     messages_list.append(f"Клиент: {user_text}")
     messages_list.append(f"Эстет: {ai_reply_text}")
     client.context = "\n".join(messages_list[-6:])
 
-    # 8. Заявка на прием
+    # 9. Заявка на прием
     if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
 
         # 🚨 НОМЕР АДМИНА ДЛЯ УВЕДОМЛЕНИЙ (Впиши сюда свой номер с @c.us)
@@ -173,7 +184,7 @@ async def handle_whatsapp_webhook(
 
     await db.commit()
 
-    # 9. Отправляем готовый ответ
+    # 10. Отправляем готовый ответ
     await send_whatsapp_message(chat_id, ai_reply_text)
 
     return {"status": "ok"}
