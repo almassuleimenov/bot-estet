@@ -46,8 +46,9 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
     if msg_type == "textMessage":
         user_text = message_data.get("textMessageData", {}).get("textMessage", "")
 
-    elif msg_type == "extendedTextMessage":
-        # МАГИЯ ДЛЯ СВАЙПОВ
+    # 👇 ДОБАВИЛИ "quotedMessage" В ПРОВЕРКУ 👇
+    elif msg_type in ["extendedTextMessage", "quotedMessage"]:
+        # МАГИЯ ДЛЯ СВАЙПОВ И ОТВЕТОВ
         user_text = message_data.get("extendedTextMessageData", {}).get("text", "")
         if not user_text:
             print("⚠️ Свайп пришел без поля 'text'! Вытаскиваем все, что есть...")
