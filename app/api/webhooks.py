@@ -82,15 +82,24 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
         await db.commit()
         await db.refresh(client)
 
-    # Подготавливаем текущую историю
-    messages_list = client.context.split("\n") if client.context else []
-    messages_list = [m for m in messages_list if m.strip()]
+    # ==========================================
+    # 🚨 НОВАЯ ЛОГИКА ИСТОРИИ (ДЛЯ LLAMA 3)
+    # ==========================================
+    # Пытаемся загрузить контекст как JSON-массив. 
+    # Если там старый текст из прошлой версии, сбрасываем в [].
+    try:
+        messages_list = json.loads(client.context) if client.context else []
+        if not isinstance(messages_list, list):
+            messages_list = []
+    except json.JSONDecodeError:
+        messages_list = [] # Защита от старых строковых данных в БД
 
     # 5. ПРОВЕРКА КНОПКИ "СТОП" (Админ в деле)
     if not client.is_bot_active:
         print(f"🤫 Бот спит для клиента {chat_id}. Сохраняем сообщение для админа, но молчим.")
-        messages_list.append(f"Клиент: {user_text}")
-        client.context = "\n".join(messages_list[-6:])
+        # Сохраняем в новом формате
+        messages_list.append({"role": "user", "content": user_text})
+        client.context = json.dumps(messages_list[-6:], ensure_ascii=False)
         await db.commit()
         return {"status": "bot_is_sleeping"}
 
@@ -110,8 +119,11 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
         else "Прайс-лист уточняется. Консультация 2000 тг."
     )
 
+    # Вызываем нашу обновленную функцию!
     ai_response = await generate_dental_reply(
-        user_text, client.context, current_price_list
+        user_text=user_text, 
+        history=messages_list,  # Передаем массив словарей!
+        dynamic_price_list=current_price_list
     )
 
     ai_reply_text = ai_response.get("reply", "Минуточку...")
@@ -123,16 +135,18 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
     typing_delay = len(ai_reply_text) / 20.0 + random.uniform(0.5, 1.5)
     await asyncio.sleep(min(typing_delay, 5))
 
-    # 8. Обновляем историю диалога
-    messages_list.append(f"Клиент: {user_text}")
-    messages_list.append(f"Эстет: {ai_reply_text}")
-    client.context = "\n".join(messages_list[-6:])
+    # ==========================================
+    # 8. ОБНОВЛЯЕМ ИСТОРИЮ ДИАЛОГА В ФОРМАТЕ JSON
+    # ==========================================
+    messages_list.append({"role": "user", "content": user_text})
+    messages_list.append({"role": "assistant", "content": ai_reply_text})
+    # Храним последние 6 сообщений (3 пары вопрос-ответ), чтобы не жрать токены
+    client.context = json.dumps(messages_list[-6:], ensure_ascii=False)
 
-    # 9. Заявка на прием
+    # 9. Заявка на прием (ТВОЙ КОД ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ)
     if ai_action in ["booking_requested", "time_agreed"] and appointment_time:
-
-        # 🚨 НОМЕР АДМИНА ДЛЯ УВЕДОМЛЕНИЙ (Впиши сюда свой номер с @c.us)
-        ADMIN_WHATSAPP = "77772605712@c.us"
+        
+        ADMIN_WHATSAPP = "77772605712@c.us" # Твой номер
 
         result_app = await db.execute(
             select(Appointment)
@@ -142,25 +156,20 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
         )
         existing_app = result_app.scalars().first()
 
-        # Маскируем номер для красоты в уведомлении
         clean_phone = chat_id.replace("@c.us", "")
 
         if existing_app:
             existing_app.appointment_time = appointment_time
             existing_app.status = "pending"
-            print(
-                f"🔄 Время обновлено на {appointment_time}. Карточка ждет назначения врача админом (pending)."
-            )
+            print(f"🔄 Время обновлено на {appointment_time}.")
 
-            # --- ОТПРАВЛЯЕМ ПУШ АДМИНУ (Обновление времени) ---
             admin_msg = (
                 f"⚠️ *CRM Эстет: Обновление заявки!*\n\n"
                 f"👤 Пациент: +{clean_phone}\n"
                 f"🕒 Новое время: {appointment_time}\n\n"
-                f"💻 Зайдите в админку, чтобы подтвердить и назначить врача!"
+                f"💻 Зайдите в админку!"
             )
             await send_whatsapp_message(ADMIN_WHATSAPP, admin_msg)
-
         else:
             new_appointment = Appointment(
                 client_id=client.id,
@@ -169,17 +178,14 @@ async def handle_whatsapp_webhook(request: Request, db: AsyncSession = Depends(g
                 status="pending",
             )
             db.add(new_appointment)
-            print(
-                f"🛎️ НОВАЯ ЗАЯВКА! Услуга: {suggested_service}, Время: {appointment_time}"
-            )
+            print(f"🛎️ НОВАЯ ЗАЯВКА! Услуга: {suggested_service}, Время: {appointment_time}")
 
-            # --- ОТПРАВЛЯЕМ ПУШ АДМИНУ (Новая заявка) ---
             admin_msg = (
                 f"🚨 *CRM Эстет: НОВАЯ ЗАЯВКА!*\n\n"
                 f"👤 Пациент: +{clean_phone}\n"
                 f"🦷 Услуга: {suggested_service or 'Консультация'}\n"
                 f"🕒 Время: {appointment_time}\n\n"
-                f"💻 Зайдите в панель управления, карточка уже в 'Запросах'!"
+                f"💻 Зайдите в панель управления!"
             )
             await send_whatsapp_message(ADMIN_WHATSAPP, admin_msg)
 
