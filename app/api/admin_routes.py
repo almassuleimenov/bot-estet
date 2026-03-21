@@ -190,3 +190,37 @@ async def add_doctor(data: DoctorCreateRequest, db: AsyncSession = Depends(get_d
     db.add(new_doc)
     await db.commit()
     return {"status": "success", "message": "Врач успешно добавлен!"}
+
+@router.put("/doctors/{doctor_id}")
+async def update_doctor(
+    doctor_id: int, data: DoctorCreateRequest, db: AsyncSession = Depends(get_db)
+):
+    """Обновить данные врача"""
+    result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
+    doctor = result.scalars().first()
+
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Врач не найден")
+
+    # Обновляем поля
+    doctor.name = data.name
+    doctor.phone = data.phone
+    doctor.specialty = data.specialty
+    
+    await db.commit()
+    return {"status": "success", "message": "Данные врача обновлены!"}
+
+
+@router.delete("/doctors/{doctor_id}")
+async def delete_doctor(doctor_id: int, db: AsyncSession = Depends(get_db)):
+    """Удалить врача"""
+    result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
+    doctor = result.scalars().first()
+
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Врач не найден")
+
+    # Удаляем из базы
+    await db.delete(doctor)
+    await db.commit()
+    return {"status": "success", "message": "Врач успешно удален!"}
